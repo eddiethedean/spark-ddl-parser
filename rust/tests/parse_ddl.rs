@@ -63,10 +63,8 @@ fn array_and_map() {
 
 #[test]
 fn nested_struct() {
-    let schema = parse_ddl_schema(
-        "id long, address struct<street:string,city:string,zip:string>",
-    )
-    .unwrap();
+    let schema =
+        parse_ddl_schema("id long, address struct<street:string,city:string,zip:string>").unwrap();
     assert_eq!(schema.fields.len(), 2);
     assert_eq!(schema.fields[1].name, "address");
     let inner = match &schema.fields[1].data_type {
@@ -182,20 +180,14 @@ fn err_comma_at_start() {
 fn err_empty_array_type() {
     let r = parse_ddl_schema("tags array<>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidArrayType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidArrayType(_)));
 }
 
 #[test]
 fn err_map_missing_comma() {
     let r = parse_ddl_schema("metadata map<stringstring>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidMapType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidMapType(_)));
 }
 
 #[test]

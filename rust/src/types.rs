@@ -84,32 +84,53 @@ impl StructType {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_data_type_type_name() {
-        assert_eq!(DataType::Simple { type_name: "long".into() }.type_name(), "long");
-        assert_eq!(DataType::Decimal { precision: 10, scale: 2 }.type_name(), "decimal");
-        assert_eq!(
-            DataType::Array { element_type: Box::new(DataType::Simple { type_name: "string".into() }) }.type_name(),
-            "array"
-        );
-        assert_eq!(StructType::new(vec![]).type_name, "struct");
-    }
-}
-
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DataType::Simple { type_name } => write!(f, "{}", type_name),
             DataType::Decimal { precision, scale } => write!(f, "decimal({},{})", precision, scale),
             DataType::Array { element_type } => write!(f, "array<{}>", element_type),
-            DataType::Map { key_type, value_type } => {
+            DataType::Map {
+                key_type,
+                value_type,
+            } => {
                 write!(f, "map<{},{}>", key_type, value_type)
             }
             DataType::Struct(_s) => write!(f, "struct<...>"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_data_type_type_name() {
+        assert_eq!(
+            DataType::Simple {
+                type_name: "long".into()
+            }
+            .type_name(),
+            "long"
+        );
+        assert_eq!(
+            DataType::Decimal {
+                precision: 10,
+                scale: 2
+            }
+            .type_name(),
+            "decimal"
+        );
+        assert_eq!(
+            DataType::Array {
+                element_type: Box::new(DataType::Simple {
+                    type_name: "string".into()
+                })
+            }
+            .type_name(),
+            "array"
+        );
+        assert_eq!(StructType::new(vec![]).type_name, "struct");
     }
 }

@@ -2,8 +2,8 @@
 //!
 //! Ported from test_ddl_parser_performance.py. Run with `cargo test --test test_performance`.
 
-use std::time::Instant;
 use spark_ddl_parser::parse_ddl_schema;
+use std::time::Instant;
 
 const MAX_MS_100: u128 = 1000;
 const MAX_MS_200: u128 = 2000;
@@ -18,42 +18,74 @@ const MAX_MS_COLONS: u128 = 1000;
 
 #[test]
 fn large_schema_100_fields() {
-    let fields = (0..100).map(|i| format!("field{} string", i)).collect::<Vec<_>>().join(", ");
+    let fields = (0..100)
+        .map(|i| format!("field{} string", i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let start = Instant::now();
     let schema = parse_ddl_schema(&fields).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 100);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 #[test]
 fn large_schema_500_fields() {
-    let fields = (0..500).map(|i| format!("field{} int", i)).collect::<Vec<_>>().join(", ");
+    let fields = (0..500)
+        .map(|i| format!("field{} int", i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let start = Instant::now();
     let schema = parse_ddl_schema(&fields).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 500);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 #[test]
 fn large_schema_1000_fields() {
-    let fields = (0..1000).map(|i| format!("field{} long", i)).collect::<Vec<_>>().join(", ");
+    let fields = (0..1000)
+        .map(|i| format!("field{} long", i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let start = Instant::now();
     let schema = parse_ddl_schema(&fields).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 1000);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 #[test]
 fn large_schema_2000_fields() {
-    let fields = (0..2000).map(|i| format!("field{} double", i)).collect::<Vec<_>>().join(", ");
+    let fields = (0..2000)
+        .map(|i| format!("field{} double", i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let start = Instant::now();
     let schema = parse_ddl_schema(&fields).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 2000);
-    assert!(duration < MAX_MS_200, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_200);
+    assert!(
+        duration < MAX_MS_200,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_200
+    );
 }
 
 // ==================== Deep Nesting ====================
@@ -69,7 +101,12 @@ fn deeply_nested_10_levels() {
     let schema = parse_ddl_schema(&ddl).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 1);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 #[test]
@@ -83,7 +120,12 @@ fn deeply_nested_20_levels() {
     let schema = parse_ddl_schema(&ddl).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 1);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 #[test]
@@ -97,7 +139,12 @@ fn deeply_nested_50_levels() {
     let schema = parse_ddl_schema(&ddl).unwrap();
     let duration = start.elapsed().as_millis();
     assert_eq!(schema.fields.len(), 1);
-    assert!(duration < MAX_MS_100, "Parsing took {}ms, expected < {}ms", duration, MAX_MS_100);
+    assert!(
+        duration < MAX_MS_100,
+        "Parsing took {}ms, expected < {}ms",
+        duration,
+        MAX_MS_100
+    );
 }
 
 // ==================== Batch Parsing ====================
@@ -105,10 +152,18 @@ fn deeply_nested_50_levels() {
 #[test]
 fn batch_parsing_100_schemas() {
     let schemas: Vec<String> = (0..100)
-        .map(|_| (0..10).map(|i| format!("field{} string", i)).collect::<Vec<_>>().join(", "))
+        .map(|_| {
+            (0..10)
+                .map(|i| format!("field{} string", i))
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
         .collect();
     let start = Instant::now();
-    let results: Vec<_> = schemas.iter().map(|s| parse_ddl_schema(s).unwrap()).collect();
+    let results: Vec<_> = schemas
+        .iter()
+        .map(|s| parse_ddl_schema(s).unwrap())
+        .collect();
     let duration = start.elapsed().as_millis();
     assert_eq!(results.len(), 100);
     assert!(results.iter().all(|r| r.fields.len() == 10));
@@ -119,7 +174,9 @@ fn batch_parsing_100_schemas() {
 fn batch_parsing_1000_schemas() {
     let schema_str = "id long, name string";
     let start = Instant::now();
-    let results: Vec<_> = (0..1000).map(|_| parse_ddl_schema(schema_str).unwrap()).collect();
+    let results: Vec<_> = (0..1000)
+        .map(|_| parse_ddl_schema(schema_str).unwrap())
+        .collect();
     let duration = start.elapsed().as_millis();
     assert_eq!(results.len(), 1000);
     assert!(results.iter().all(|r| r.fields.len() == 2));
@@ -130,14 +187,21 @@ fn batch_parsing_1000_schemas() {
 
 #[test]
 fn repeated_parsing_same_schema() {
-    let schema_str = (0..100).map(|i| format!("field{} string", i)).collect::<Vec<_>>().join(", ");
+    let schema_str = (0..100)
+        .map(|i| format!("field{} string", i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let start = Instant::now();
     for _ in 0..100 {
         let schema = parse_ddl_schema(&schema_str).unwrap();
         assert_eq!(schema.fields.len(), 100);
     }
     let duration = start.elapsed().as_millis();
-    assert!(duration < MAX_MS_REPEAT, "Repeated parsing took {}ms", duration);
+    assert!(
+        duration < MAX_MS_REPEAT,
+        "Repeated parsing took {}ms",
+        duration
+    );
 }
 
 #[test]
@@ -214,7 +278,10 @@ fn stress_large_and_nested() {
 
 #[test]
 fn stress_deep_and_wide() {
-    let nested_fields = (0..50).map(|i| format!("field{}:string", i)).collect::<Vec<_>>().join(",");
+    let nested_fields = (0..50)
+        .map(|i| format!("field{}:string", i))
+        .collect::<Vec<_>>()
+        .join(",");
     let mut nested = format!("struct<{}>", nested_fields);
     for i in 0..10 {
         nested = format!("struct<level{}:{}>", i, nested);
@@ -260,7 +327,10 @@ fn linear_scaling() {
     let sizes = [10_usize, 50, 100, 500, 1000];
     let mut times = Vec::with_capacity(sizes.len());
     for &size in &sizes {
-        let fields = (0..size).map(|i| format!("field{} string", i)).collect::<Vec<_>>().join(", ");
+        let fields = (0..size)
+            .map(|i| format!("field{} string", i))
+            .collect::<Vec<_>>()
+            .join(", ");
         let start = Instant::now();
         let schema = parse_ddl_schema(&fields).unwrap();
         times.push(start.elapsed().as_nanos());

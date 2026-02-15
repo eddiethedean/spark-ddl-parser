@@ -129,30 +129,21 @@ fn invalid_type() {
 fn empty_array_type() {
     let r = parse_ddl_schema("tags array<>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidArrayType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidArrayType(_)));
 }
 
 #[test]
 fn map_missing_value_type() {
     let r = parse_ddl_schema("metadata map<string>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidMapType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidMapType(_)));
 }
 
 #[test]
 fn map_missing_comma() {
     let r = parse_ddl_schema("metadata map<stringstring>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidMapType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidMapType(_)));
 }
 
 // ==================== Nested Errors ====================
@@ -172,9 +163,7 @@ fn nested_unbalanced() {
 #[test]
 fn deeply_nested_unbalanced() {
     // Missing one '>' to close outer struct (same as Python test)
-    let r = parse_ddl_schema(
-        "data struct<items:array<map<string,struct<id:long,name:string>>>",
-    );
+    let r = parse_ddl_schema("data struct<items:array<map<string,struct<id:long,name:string>>>");
     assert!(r.is_err());
 }
 
@@ -190,20 +179,14 @@ fn empty_struct() {
 fn empty_array() {
     let r = parse_ddl_schema("tags array<>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidArrayType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidArrayType(_)));
 }
 
 #[test]
 fn empty_map() {
     let r = parse_ddl_schema("metadata map<>");
     assert!(r.is_err());
-    assert!(matches!(
-        r.unwrap_err(),
-        ParseError::InvalidMapType(_)
-    ));
+    assert!(matches!(r.unwrap_err(), ParseError::InvalidMapType(_)));
 }
 
 // ==================== Invalid Decimal (Python: still returns 1 field / default decimal) ====================
@@ -408,9 +391,7 @@ fn map_with_array_unbalanced() {
 
 #[test]
 fn nested_mixed_unbalanced() {
-    let r = parse_ddl_schema(
-        "complex struct<items:array<map<string,struct<id:long,name:string>>>",
-    );
+    let r = parse_ddl_schema("complex struct<items:array<map<string,struct<id:long,name:string>>>");
     assert!(r.is_err());
 }
 

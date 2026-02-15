@@ -41,10 +41,7 @@ fn type_mapping() -> HashMap<&'static str, &'static str> {
 ///
 /// Empty or whitespace-only input returns a struct with no fields.
 pub fn parse_ddl_schema(input: &str) -> Result<StructType> {
-    let s = input
-        .replace('\t', " ")
-        .replace('\n', " ")
-        .replace('\r', " ");
+    let s = input.replace(['\t', '\n', '\r'], " ");
     let s = s.trim();
 
     if s.is_empty() {
@@ -69,14 +66,18 @@ pub fn parse_ddl_schema(input: &str) -> Result<StructType> {
     let field_strings = split_ddl_fields(&s);
 
     if field_strings.is_empty() {
-        return Err(ParseError::InvalidFieldDefinition("empty schema".to_string()));
+        return Err(ParseError::InvalidFieldDefinition(
+            "empty schema".to_string(),
+        ));
     }
 
     let mut fields = Vec::with_capacity(field_strings.len());
     for field_str in field_strings {
         let field_str = field_str.trim();
         if field_str.is_empty() {
-            return Err(ParseError::InvalidFieldDefinition("empty field".to_string()));
+            return Err(ParseError::InvalidFieldDefinition(
+                "empty field".to_string(),
+            ));
         }
         let field = parse_field(field_str)?;
         fields.push(field);
@@ -327,10 +328,7 @@ fn parse_type(type_str: &str) -> Result<DataType> {
         }
         let comma_pos = find_map_comma(inner);
         let (key_str, value_str) = if let Some(pos) = comma_pos {
-            (
-                inner[..pos].trim(),
-                inner[pos + 1..].trim(),
-            )
+            (inner[..pos].trim(), inner[pos + 1..].trim())
         } else {
             return Err(ParseError::InvalidMapType(type_str.to_string()));
         };
@@ -405,7 +403,10 @@ fn parse_decimal_type(type_str: &str) -> Result<DataType> {
     }
     let inner = rest[..rest.len() - 1].trim();
     let Some(comma_pos) = inner.find(',') else {
-        return Ok(DataType::Decimal { precision: 10, scale: 0 });
+        return Ok(DataType::Decimal {
+            precision: 10,
+            scale: 0,
+        });
     };
     let precision_str = inner[..comma_pos].trim();
     let scale_str = inner[comma_pos + 1..].trim();
@@ -465,7 +466,10 @@ mod tests {
     #[test]
     fn test_validate_balanced_brackets_extra_close() {
         let r = validate_balanced_brackets("a array<string>>");
-        assert!(matches!(r, Err(ParseError::UnbalancedAngleBracketsExtraClose)));
+        assert!(matches!(
+            r,
+            Err(ParseError::UnbalancedAngleBracketsExtraClose)
+        ));
     }
 
     #[test]
