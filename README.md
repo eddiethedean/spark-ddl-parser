@@ -4,6 +4,8 @@ Spark DDL Parser turns Spark SQL schema strings into structured Python or Rust v
 
 The Python package has no runtime dependencies and requires Python 3.11 or newer. This repository also contains a Rust crate, which requires Rust 1.78 or newer.
 
+Version **0.2.0** is released as [`v0.2.0`](https://github.com/eddiethedean/spark-ddl-parser/tree/v0.2.0) and is available on [PyPI](https://pypi.org/project/spark-ddl-parser/0.2.0/) and [crates.io](https://crates.io/crates/spark-ddl-parser/0.2.0/). [Release CI](https://github.com/eddiethedean/spark-ddl-parser/actions/runs/38623091999) passed all checks and published both packages.
+
 ## Python
 
 Install from PyPI:
