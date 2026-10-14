@@ -75,6 +75,8 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 ```
 
+To publish both packages, follow the [release guide](https://github.com/eddiethedean/spark-ddl-parser/blob/main/docs/releasing.md).
+
 ## License
 
 MIT. See [LICENSE](https://github.com/eddiethedean/spark-ddl-parser/blob/main/LICENSE).
