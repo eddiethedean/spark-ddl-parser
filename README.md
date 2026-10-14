@@ -1,219 +1,80 @@
 # Spark DDL Parser
 
-A zero-dependency Python library for parsing PySpark DDL schema strings into structured Python objects.
+Spark DDL Parser turns Spark SQL schema strings into structured Python or Rust values. It parses schema declarations; it does not run SQL or require Spark.
 
-## Features
+The Python package has no runtime dependencies and requires Python 3.11 or newer. This repository also contains a Rust crate, which requires Rust 1.78 or newer.
 
-- **Zero Dependencies**: Only uses Python standard library
-- **PySpark Compatible**: Parses standard PySpark DDL format
-- **Type Safe**: Returns structured dataclasses
-- **Comprehensive**: Supports all PySpark data types including nested structs, arrays, and maps
-- **Well Tested**: 200+ test cases covering edge cases and performance
+## Python
 
-## Installation
+Install from PyPI:
 
 ```bash
-pip install spark-ddl-parser
+python -m pip install spark-ddl-parser
 ```
 
-## Quick Start
+Parse a schema and inspect its fields:
 
 ```python
 from spark_ddl_parser import parse_ddl_schema
 
-# Parse a simple schema
-schema = parse_ddl_schema("id long, name string")
+schema = parse_ddl_schema("id BIGINT NOT NULL, name string, amount decimal(12, 2)")
 
-print(schema.fields[0].name)  # 'id'
-print(schema.fields[0].data_type.type_name)  # 'long'
-print(schema.fields[1].name)  # 'name'
-print(schema.fields[1].data_type.type_name)  # 'string'
+for field in schema.fields:
+    print(field.name, field.data_type.type_name, field.nullable)
 ```
 
-## Supported Types
+`parse_ddl_schema` returns a `StructType`. Each field has a name, a `DataType`, and a `nullable` flag. The public type classes are `DataType`, `SimpleType`, `DecimalType`, `ArrayType`, `MapType`, `StructType`, and `StructField`.
 
-### Simple Types
-- `string`, `int`, `integer`, `long`, `bigint`
-- `double`, `float`, `short`, `smallint`, `byte`, `tinyint`
-- `boolean`, `bool`, `date`, `timestamp`, `binary`
+## Rust
 
-### Complex Types
-- **Arrays**: `array<string>`, `array<long>`
-- **Maps**: `map<string,int>`, `map<string,array<long>>`
-- **Structs**: `struct<name:string,age:int>`
-- **Decimal**: `decimal(10,2)` (with precision and scale)
+Add the crate to `Cargo.toml`:
 
-### Nested Structures
-
-```python
-# Nested structs
-schema = parse_ddl_schema("""
-    id long,
-    address struct<
-        street:string,
-        city:string,
-        zip:string
-    >,
-    tags array<string>,
-    metadata map<string,string>
-""")
-
-# Access nested fields
-address_field = schema.fields[1]
-print(address_field.name)  # 'address'
-print(address_field.data_type.type_name)  # 'struct'
+```toml
+[dependencies]
+spark-ddl-parser = "0.2"
 ```
 
-## API Reference
+Then parse a schema:
 
-### `parse_ddl_schema(ddl_string: str) -> StructType`
+```rust
+use spark_ddl_parser::parse_ddl_schema;
 
-Parse a DDL schema string into a structured type.
-
-**Parameters:**
-- `ddl_string` (str): DDL schema string (e.g., "id long, name string")
-
-**Returns:**
-- `StructType`: Structured type with fields
-
-**Raises:**
-- `ValueError`: If DDL string is invalid
-
-**Example:**
-```python
-schema = parse_ddl_schema("id long, name string")
+let schema = parse_ddl_schema("id BIGINT NOT NULL, name string")?;
+assert_eq!(schema.fields[0].name, "id");
+assert!(!schema.fields[0].nullable);
 ```
 
-### Type Objects
+The crate has no required runtime dependencies. Enable the optional `serde` feature to derive `Serialize` and `Deserialize` for the schema types. See the [Rust guide](https://github.com/eddiethedean/spark-ddl-parser/blob/main/rust/README.md) for details.
 
-#### `StructType`
-Represents a struct containing fields.
+## Supported syntax
 
-**Attributes:**
-- `type_name` (str): Always "struct"
-- `fields` (List[StructField]): List of struct fields
+The parser supports comma-separated fields, nested arrays, maps and structs, decimal precision and scale, case-insensitive type names, backtick-quoted field names, and `NOT NULL` fields. Field declarations can use either a space or a colon between the name and type.
 
-#### `StructField`
-Represents a field in a struct.
+See the [supported syntax reference](https://github.com/eddiethedean/spark-ddl-parser/blob/main/docs/supported-syntax.md) for type aliases, nullability behavior, limits, and examples.
 
-**Attributes:**
-- `name` (str): Field name
-- `data_type` (DataType): Field data type
-- `nullable` (bool): Whether field is nullable (default: True)
+## Errors
 
-#### `SimpleType`
-Represents a simple data type.
-
-**Attributes:**
-- `type_name` (str): Type name (e.g., "string", "long", "int")
-
-#### `ArrayType`
-Represents an array type.
-
-**Attributes:**
-- `type_name` (str): Always "array"
-- `element_type` (DataType): Type of array elements
-
-#### `MapType`
-Represents a map type.
-
-**Attributes:**
-- `type_name` (str): Always "map"
-- `key_type` (DataType): Type of map keys
-- `value_type` (DataType): Type of map values
-
-#### `DecimalType`
-Represents a decimal type.
-
-**Attributes:**
-- `type_name` (str): Always "decimal"
-- `precision` (int): Decimal precision (default: 10)
-- `scale` (int): Decimal scale (default: 0)
-
-## Examples
-
-### Basic Schema
-```python
-from spark_ddl_parser import parse_ddl_schema
-
-schema = parse_ddl_schema("id long, name string, age int")
-print(len(schema.fields))  # 3
-```
-
-### Arrays and Maps
-```python
-schema = parse_ddl_schema("""
-    tags array<string>,
-    scores array<long>,
-    metadata map<string,string>,
-    counts map<string,int>
-""")
-```
-
-### Nested Structs
-```python
-schema = parse_ddl_schema("""
-    user struct<
-        id:long,
-        name:string,
-        address:struct<
-            street:string,
-            city:string
-        >
-    >
-""")
-```
-
-### Decimal Types
-```python
-schema = parse_ddl_schema("price decimal(10,2), rate decimal(5,4)")
-```
-
-## Format Support
-
-The parser supports both space and colon separators:
-
-```python
-# Space separator
-schema1 = parse_ddl_schema("id long, name string")
-
-# Colon separator
-schema2 = parse_ddl_schema("id:long, name:string")
-```
-
-## Error Handling
-
-The parser provides detailed error messages for invalid DDL:
-
-```python
-try:
-    schema = parse_ddl_schema("id long, name")  # Missing type
-except ValueError as e:
-    print(e)  # "Invalid field definition: name"
-```
+Python raises `TypeError` when the input is not a string and `ValueError` for malformed schemas or unsupported type names. Rust returns `Result<StructType, ParseError>`.
 
 ## Development
 
+Run the Python checks from the repository root:
+
 ```bash
-# Install in development mode
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
+ruff check spark_ddl_parser tests
+ruff format --check spark_ddl_parser tests
+python -m pytest
+```
 
-# Run tests
-pytest
+Run the Rust checks from `rust/`:
 
-# Run with coverage
-pytest --cov=spark_ddl_parser
+```bash
+cargo fmt -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
 ```
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Related Projects
-
-- [mock-spark](https://github.com/eddiethedean/mock-spark) - Uses this parser for DDL schema support
-
+MIT. See [LICENSE](https://github.com/eddiethedean/spark-ddl-parser/blob/main/LICENSE).

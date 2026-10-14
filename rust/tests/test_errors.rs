@@ -121,8 +121,10 @@ fn comma_at_start() {
 
 #[test]
 fn invalid_type() {
-    let schema = parse_ddl_schema("id invalidtype").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("id invalidtype").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }
 
 #[test]
@@ -150,8 +152,10 @@ fn map_missing_comma() {
 
 #[test]
 fn nested_invalid_type() {
-    let schema = parse_ddl_schema("data struct<id:invalidtype>").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("data struct<id:invalidtype>").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }
 
 #[test]
@@ -189,36 +193,46 @@ fn empty_map() {
     assert!(matches!(r.unwrap_err(), ParseError::InvalidMapType(_)));
 }
 
-// ==================== Invalid Decimal (Python: still returns 1 field / default decimal) ====================
+// ==================== Invalid Decimal ====================
 
 #[test]
 fn decimal_letters() {
-    let schema = parse_ddl_schema("value decimal(a,b)").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("value decimal(a,b)").unwrap_err(),
+        ParseError::InvalidDecimalType(_)
+    ));
 }
 
 #[test]
 fn decimal_negative_precision() {
-    let schema = parse_ddl_schema("value decimal(-1,2)").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("value decimal(-1,2)").unwrap_err(),
+        ParseError::InvalidDecimalType(_)
+    ));
 }
 
 #[test]
 fn decimal_negative_scale() {
-    let schema = parse_ddl_schema("value decimal(10,-2)").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("value decimal(10,-2)").unwrap_err(),
+        ParseError::InvalidDecimalType(_)
+    ));
 }
 
 #[test]
 fn decimal_scale_greater_than_precision() {
-    let schema = parse_ddl_schema("value decimal(5,10)").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("value decimal(5,10)").unwrap_err(),
+        ParseError::InvalidDecimalType(_)
+    ));
 }
 
 #[test]
 fn decimal_too_large() {
-    let schema = parse_ddl_schema("value decimal(1000,500)").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("value decimal(1000,500)").unwrap_err(),
+        ParseError::InvalidDecimalType(_)
+    ));
 }
 
 #[test]
@@ -237,8 +251,7 @@ fn decimal_extra_paren() {
 
 #[test]
 fn double_colon() {
-    let schema = parse_ddl_schema("id::long").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(parse_ddl_schema("id::long").is_err());
 }
 
 #[test]
@@ -305,8 +318,8 @@ fn quotes_in_field_name() {
 
 #[test]
 fn backticks_in_field_name() {
-    let r = parse_ddl_schema("`field name` string");
-    assert!(r.is_err());
+    let schema = parse_ddl_schema("`field name` string").unwrap();
+    assert_eq!(schema.fields[0].name, "field name");
 }
 
 // ==================== Edge Cases ====================
@@ -442,22 +455,28 @@ fn only_angle_brackets() {
     ));
 }
 
-// ==================== Type Name Errors (unknown type -> default string) ====================
+// ==================== Unsupported Type Names ====================
 
 #[test]
 fn type_with_extra_chars() {
-    let schema = parse_ddl_schema("id longextra").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("id longextra").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }
 
 #[test]
 fn type_with_numbers() {
-    let schema = parse_ddl_schema("id long123").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("id long123").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }
 
 #[test]
 fn type_with_special_chars() {
-    let schema = parse_ddl_schema("id long-type").unwrap();
-    assert_eq!(schema.fields.len(), 1);
+    assert!(matches!(
+        parse_ddl_schema("id long-type").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }

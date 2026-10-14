@@ -1,33 +1,19 @@
-"""
-DDL Schema Parser for PySpark.
-
-This module provides functionality to parse DDL (Data Definition Language) schema strings
-into structured type objects.
-
-Example:
-    >>> from spark_ddl_parser import parse_ddl_schema
-    >>> schema = parse_ddl_schema("id long, name string")
-    >>> print(schema)
-    StructType(fields=[StructField(name='id', dataType=SimpleType(type_name='long'), nullable=True),
-                       StructField(name='name', dataType=SimpleType(type_name='string'), nullable=True)])
-"""
+"""Parser for Spark SQL DDL schema strings."""
 
 import re
-from typing import List
 
 from .types import (
-    StructType,
-    StructField,
-    SimpleType,
-    DecimalType,
     ArrayType,
-    MapType,
     DataType,
+    DecimalType,
+    MapType,
+    SimpleType,
+    StructField,
+    StructType,
 )
 
-
-# Type mapping from DDL type names to type identifiers
-TYPE_MAPPING = {
+_MAX_NESTING = 128
+_TYPE_MAPPING = {
     "string": "string",
     "int": "integer",
     "integer": "integer",
@@ -35,447 +21,244 @@ TYPE_MAPPING = {
     "bigint": "long",
     "double": "double",
     "float": "float",
+    "real": "float",
     "boolean": "boolean",
     "bool": "boolean",
     "date": "date",
     "timestamp": "timestamp",
-    "decimal": "decimal",
+    "timestamp_ltz": "timestamp",
+    "timestamp_ntz": "timestamp_ntz",
     "binary": "binary",
     "short": "short",
     "smallint": "short",
     "byte": "byte",
     "tinyint": "byte",
 }
+_DECIMAL_RE = re.compile(
+    r"(?:decimal|dec|numeric)\s*(?:\(\s*([0-9]+)\s*(?:,\s*([0-9]+)\s*)?\))?", re.I
+)
 
 
 def parse_ddl_schema(ddl_string: str) -> StructType:
-    """Parse DDL schema string into StructType.
-    
-    Supports PySpark's DDL format:
-    - Simple: "id long, name string"
-    - With nullability: "id long, name string, age int"
-    - Nested: "id long, address struct<street:string,city:string>"
-    - Arrays: "tags array<string>"
-    - Maps: "metadata map<string,string>"
-    
-    Args:
-        ddl_string: DDL schema string (e.g., "id long, name string")
-    
-    Returns:
-        StructType with parsed fields
-    
-    Raises:
-        ValueError: If DDL string is invalid
-    
-    Example:
-        >>> schema = parse_ddl_schema("id long, name string")
-        >>> schema.fields[0].name
-        'id'
-        >>> schema.fields[0].data_type.type_name
-        'long'
+    """Parse a Spark DDL schema into structured Python objects.
+
+    Supports nested structs, arrays, maps, decimal types, quoted identifiers,
+    both space and colon field separators, and ``NOT NULL`` fields.
     """
-    if not ddl_string or not ddl_string.strip():
+    if not isinstance(ddl_string, str):
+        raise TypeError("DDL schema must be a string")
+    return _parse_schema(ddl_string, 0)
+
+
+def _parse_schema(ddl_string: str, depth: int) -> StructType:
+    if depth > _MAX_NESTING:
+        raise ValueError(f"Maximum DDL nesting depth ({_MAX_NESTING}) exceeded")
+    ddl = ddl_string.strip()
+    if not ddl:
         return StructType(type_name="struct", fields=[])
-    
-    # Normalize whitespace: replace tabs, newlines, carriage returns with spaces
-    ddl_string = ddl_string.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
-    
-    # Remove leading/trailing whitespace and "struct<" wrapper if present
-    ddl_string = ddl_string.strip()
-    if ddl_string.startswith("struct<"):
-        ddl_string = ddl_string[7:]
-        if ddl_string.endswith(">"):
-            ddl_string = ddl_string[:-1]
-        else:
-            raise ValueError(f"Invalid struct type: struct<{ddl_string}>")
-    
-    # Validate comma usage (run before bracket validation)
-    _validate_comma_usage(ddl_string)
-    
-    # Validate brackets before splitting fields
-    # This catches errors like "tags array<string>>" (extra >)
-    _validate_balanced_brackets(ddl_string)
-    
-    # Split by comma, but be careful with nested structs, arrays, and maps
-    field_strings = _split_ddl_fields(ddl_string)
-    
-    # Validate no empty fields
-    if not field_strings:
-        raise ValueError("Invalid field definition: empty schema")
-    
-    fields = []
-    
-    for field_str in field_strings:
-        if not field_str.strip():
-            raise ValueError("Invalid field definition: empty field")
-        field = _parse_field(field_str.strip())
-        fields.append(field)
-    
-    return StructType(type_name="struct", fields=fields)
+
+    struct_prefix = _complex_prefix_length(ddl, "struct")
+    if struct_prefix is not None:
+        if not ddl.endswith(">"):
+            raise ValueError(f"Invalid struct type: {ddl}")
+        ddl = ddl[struct_prefix:-1].strip()
+
+    _validate_delimiters(ddl)
+    parts = _split_top_level(ddl, ",")
+    if not parts or any(not part.strip() for part in parts):
+        raise ValueError("Invalid field definition: empty field")
+    return StructType(
+        type_name="struct",
+        fields=[_parse_field(part.strip(), depth) for part in parts],
+    )
 
 
-def _validate_balanced_brackets(s: str) -> None:
-    """Validate that brackets and parentheses are balanced.
-    
-    Args:
-        s: String to validate
-    
-    Raises:
-        ValueError: If brackets or parentheses are unbalanced
-    """
-    angle_depth = 0
-    paren_depth = 0
-    
-    for char in s:
+def _scan(s: str):
+    """Yield (index, character, angle depth, paren depth) outside quoted names."""
+    angle = paren = 0
+    quoted = False
+    i = 0
+    while i < len(s):
+        char = s[i]
+        if char == "`":
+            if quoted and i + 1 < len(s) and s[i + 1] == "`":
+                i += 2
+                continue
+            quoted = not quoted
+            i += 1
+            continue
+        if not quoted:
+            if char == "<":
+                angle += 1
+            elif char == ">":
+                angle -= 1
+            elif char == "(":
+                paren += 1
+            elif char == ")":
+                paren -= 1
+            yield i, char, angle, paren
+        i += 1
+    if quoted:
+        raise ValueError("Invalid field definition: unterminated backtick identifier")
+
+
+def _validate_delimiters(s: str) -> None:
+    stack = []
+    quoted = False
+    i = 0
+    while i < len(s):
+        char = s[i]
+        if char == "`":
+            if quoted and i + 1 < len(s) and s[i + 1] == "`":
+                i += 2
+                continue
+            quoted = not quoted
+        elif not quoted:
+            if char in "<(":
+                stack.append(char)
+            elif char in ">)":
+                expected = "<" if char == ">" else "("
+                if not stack or stack.pop() != expected:
+                    raise ValueError(f"Unbalanced delimiter: extra '{char}'")
+        i += 1
+    if quoted:
+        raise ValueError("Invalid field definition: unterminated backtick identifier")
+    if stack:
+        char = stack[-1]
         if char == "<":
-            angle_depth += 1
-        elif char == ">":
-            angle_depth -= 1
-            if angle_depth < 0:
-                raise ValueError("Unbalanced angle brackets: extra '>'")
-        elif char == "(":
-            paren_depth += 1
-        elif char == ")":
-            paren_depth -= 1
-            if paren_depth < 0:
-                raise ValueError("Unbalanced parentheses: extra ')'")
-    
-    if angle_depth > 0:
-        raise ValueError("Unbalanced angle brackets: missing '>'")
-    if paren_depth > 0:
+            raise ValueError("Unbalanced angle brackets: missing '>'")
         raise ValueError("Unbalanced parentheses: missing ')'")
 
 
-def _validate_comma_usage(s: str) -> None:
-    """Validate comma usage in DDL string.
-    
-    Checks for:
-    - Comma at start
-    - Double commas
-    - Trailing comma
-    
-    Args:
-        s: String to validate
-    
-    Raises:
-        ValueError: If comma usage is invalid
-    """
-    if not s:
-        return
-    
-    # Check for comma at start
-    if s.strip().startswith(","):
-        raise ValueError("Invalid field definition: comma at start")
-    
-    # Check for trailing comma
-    if s.strip().endswith(","):
-        raise ValueError("Invalid field definition: trailing comma")
-    
-    # Check for double commas (outside of brackets/parens)
-    angle_depth = 0
-    paren_depth = 0
-    i = 0
-    
-    while i < len(s) - 1:
-        char = s[i]
-        next_char = s[i + 1]
-        
-        if char == "<":
-            angle_depth += 1
-        elif char == ">":
-            angle_depth -= 1
-        elif char == "(":
-            paren_depth += 1
-        elif char == ")":
-            paren_depth -= 1
-        elif char == "," and angle_depth == 0 and paren_depth == 0:
-            # Check if next non-whitespace character is also a comma
-            if next_char == ",":
-                raise ValueError("Invalid field definition: double comma")
-        
-        i += 1
+def _split_top_level(s: str, separator: str) -> list[str]:
+    positions = [
+        i
+        for i, char, angle, paren in _scan(s)
+        if char == separator and angle == 0 and paren == 0
+    ]
+    parts = []
+    start = 0
+    for pos in positions:
+        parts.append(s[start:pos])
+        start = pos + 1
+    parts.append(s[start:])
+    return parts
 
 
-def _split_ddl_fields(ddl_string: str) -> List[str]:
-    """Split DDL string into individual field definitions.
-    
-    Handles nested structures like struct<>, array<>, map<>, and decimal().
-    
-    Args:
-        ddl_string: DDL string with multiple fields
-    
-    Returns:
-        List of field definition strings
-    """
-    fields = []
-    current_field = ""
-    angle_depth = 0  # Track < and >
-    paren_depth = 0  # Track ( and )
-    i = 0
-    
-    while i < len(ddl_string):
-        char = ddl_string[i]
-        
-        if char == "<":
-            angle_depth += 1
-            current_field += char
-        elif char == ">":
-            angle_depth -= 1
-            current_field += char
-        elif char == "(":
-            paren_depth += 1
-            current_field += char
-        elif char == ")":
-            paren_depth -= 1
-            current_field += char
-        elif char == "," and angle_depth == 0 and paren_depth == 0:
-            if current_field.strip():
-                fields.append(current_field.strip())
-            current_field = ""
-        else:
-            current_field += char
-        
-        i += 1
-    
-    # Add the last field
-    if current_field.strip():
-        fields.append(current_field.strip())
-    
-    return fields
+def _top_level_field_separator(field: str) -> int | None:
+    for i, char, angle, paren in _scan(field):
+        if angle == 0 and paren == 0 and (char == ":" or char.isspace()):
+            return i
+    return None
 
 
-def _parse_field(field_str: str) -> StructField:
-    """Parse a single field definition.
-    
-    Format: "name type" or "name:type"
-    
-    Args:
-        field_str: Field definition string (e.g., "id long" or "name:string")
-    
-    Returns:
-        StructField object
-    
-    Raises:
-        ValueError: If field definition is invalid
-    """
-    if not field_str or not field_str.strip():
+def _parse_field(field_str: str, depth: int) -> StructField:
+    separator = _top_level_field_separator(field_str)
+    if separator is None:
         raise ValueError(f"Invalid field definition: {field_str}")
-    
-    # Handle both formats: "name type" and "name:type"
-    # Check if there's a colon at the top level (not inside brackets/parens)
-    has_colon_at_top_level = False
-    angle_depth = 0
-    paren_depth = 0
-    
-    for char in field_str:
-        if char == "<":
-            angle_depth += 1
-        elif char == ">":
-            angle_depth -= 1
-        elif char == "(":
-            paren_depth += 1
-        elif char == ")":
-            paren_depth -= 1
-        elif char == ":" and angle_depth == 0 and paren_depth == 0:
-            has_colon_at_top_level = True
-            break
-    
-    if has_colon_at_top_level:
-        # Split on the first colon at top level
-        name_end = None
-        angle_depth = 0
-        paren_depth = 0
-        
-        for i, char in enumerate(field_str):
-            if char == "<":
-                angle_depth += 1
-            elif char == ">":
-                angle_depth -= 1
-            elif char == "(":
-                paren_depth += 1
-            elif char == ")":
-                paren_depth -= 1
-            elif char == ":" and angle_depth == 0 and paren_depth == 0:
-                name_end = i
-                break
-        
-        if name_end is not None:
-            name = field_str[:name_end].strip()
-            type_str = field_str[name_end + 1:].strip()
-        else:
-            raise ValueError(f"Invalid field definition: {field_str}")
+    name = field_str[:separator].strip()
+    type_start = separator
+    if field_str[type_start] == ":":
+        type_start += 1
     else:
-        # Split by whitespace, name is first, rest is type
-        # But we need to be careful with complex types like struct<>, array<>, map<>
-        # Find the first space that's not inside angle brackets or parentheses
-        name_end = None
-        angle_depth = 0
-        paren_depth = 0
-        
-        for i, char in enumerate(field_str):
-            if char == "<":
-                angle_depth += 1
-            elif char == ">":
-                angle_depth -= 1
-            elif char == "(":
-                paren_depth += 1
-            elif char == ")":
-                paren_depth -= 1
-            elif char == " " and angle_depth == 0 and paren_depth == 0:
-                name_end = i
-                break
-        
-        if name_end is None:
+        while type_start < len(field_str) and field_str[type_start].isspace():
+            type_start += 1
+        if type_start < len(field_str) and field_str[type_start] == ":":
+            type_start += 1
+    while type_start < len(field_str) and field_str[type_start].isspace():
+        type_start += 1
+    type_str = field_str[type_start:].strip()
+    if not name or not type_str:
+        raise ValueError(f"Invalid field definition: {field_str}")
+
+    if name.startswith("`") or name.endswith("`"):
+        if len(name) < 2 or not (name.startswith("`") and name.endswith("`")):
             raise ValueError(f"Invalid field definition: {field_str}")
-        
-        name = field_str[:name_end].strip()
-        type_str = field_str[name_end:].strip()
-    
-    name = name.strip()
-    type_str = type_str.strip()
-    
-    # Validate name is not empty or whitespace-only
-    if not name or name.isspace():
+        quoted_name = name[1:-1]
+        name_characters = []
+        index = 0
+        while index < len(quoted_name):
+            if quoted_name[index] == "`":
+                if index + 1 >= len(quoted_name) or quoted_name[index + 1] != "`":
+                    raise ValueError(f"Invalid field definition: {field_str}")
+                name_characters.append("`")
+                index += 2
+            else:
+                name_characters.append(quoted_name[index])
+                index += 1
+        name = "".join(name_characters)
+    elif "`" in name or any(char.isspace() for char in name):
         raise ValueError(f"Invalid field definition: {field_str}")
-    
-    # Validate type is not empty
-    if not type_str:
-        raise ValueError(f"Invalid field definition: {field_str}")
-    
-    # Parse the data type
-    data_type = _parse_type(type_str)
-    
-    # All fields are nullable by default (PySpark behavior)
-    return StructField(name=name, data_type=data_type, nullable=True)
+
+    nullable = True
+    suffix = re.search(r"\s+NOT\s+NULL\s*$", type_str, re.I)
+    if suffix:
+        nullable = False
+        type_str = type_str[: suffix.start()].rstrip()
+    return StructField(
+        name=name, data_type=_parse_type(type_str, depth), nullable=nullable
+    )
 
 
-def _parse_type(type_str: str) -> DataType:
-    """Parse a type string into a DataType.
-    
-    Supports:
-    - Simple types: "string", "long", "int"
-    - Arrays: "array<string>", "array<long>"
-    - Maps: "map<string,long>"
-    - Structs: "struct<name:string,age:int>"
-    - Decimal: "decimal(10,2)"
-    
-    Args:
-        type_str: Type string (e.g., "string", "array<long>")
-    
-    Returns:
-        DataType instance
-    
-    Raises:
-        ValueError: If type string is invalid
-    """
+def _parse_type(type_str: str, depth: int) -> DataType:
+    if depth > _MAX_NESTING:
+        raise ValueError(f"Maximum DDL nesting depth ({_MAX_NESTING}) exceeded")
     type_str = type_str.strip()
-    
     if not type_str:
         raise ValueError("Invalid type: empty type string")
-    
-    # Handle decimal with precision and scale (check before struct)
-    if type_str.startswith("decimal"):
-        match = re.match(r"decimal\((\d+),(\d+)\)", type_str)
-        if match:
-            precision = int(match.group(1))
-            scale = int(match.group(2))
-            return DecimalType(type_name="decimal", precision=precision, scale=scale)
-        else:
-            # Check for incomplete decimal
-            if "(" in type_str and not type_str.endswith(")"):
-                raise ValueError(f"Invalid decimal type: {type_str}")
-            return DecimalType(type_name="decimal")  # Default decimal
-    
-    # Handle arrays
-    if type_str.startswith("array<"):
-        if not type_str.endswith(">"):
+    lowered = type_str.casefold()
+
+    match = _DECIMAL_RE.fullmatch(type_str)
+    if match:
+        precision = int(match.group(1)) if match.group(1) else 10
+        scale = int(match.group(2)) if match.group(2) else 0
+        if not 1 <= precision <= 38 or not 0 <= scale <= precision:
+            raise ValueError(f"Invalid decimal type: {type_str}")
+        return DecimalType(type_name="decimal", precision=precision, scale=scale)
+    if lowered.startswith(("decimal", "numeric", "dec (", "dec(")) or lowered == "dec":
+        raise ValueError(f"Invalid decimal type: {type_str}")
+
+    complex_prefix = _complex_prefix_length(type_str, "array")
+    if complex_prefix is not None:
+        inner = _complex_inner(type_str, "array", complex_prefix)
+        if not inner or len(_split_top_level(inner, ",")) != 1:
             raise ValueError(f"Invalid array type: {type_str}")
-        element_type_str = type_str[6:-1].strip()
-        if not element_type_str:
-            raise ValueError(f"Invalid array type: {type_str}")
-        element_type = _parse_type(element_type_str)
-        return ArrayType(type_name="array", element_type=element_type)
-    
-    # Handle maps
-    if type_str.startswith("map<"):
-        if not type_str.endswith(">"):
+        return ArrayType(type_name="array", element_type=_parse_type(inner, depth + 1))
+    complex_prefix = _complex_prefix_length(type_str, "map")
+    if complex_prefix is not None:
+        inner = _complex_inner(type_str, "map", complex_prefix)
+        parts = _split_top_level(inner, ",")
+        if len(parts) != 2 or not all(part.strip() for part in parts):
             raise ValueError(f"Invalid map type: {type_str}")
-        map_content = type_str[4:-1].strip()
-        if not map_content:
-            raise ValueError(f"Invalid map type: {type_str}")
-        
-        # Split key and value types
-        comma_pos = _find_map_comma(map_content)
-        if comma_pos == -1:
-            raise ValueError(f"Invalid map type: {type_str}")
-        
-        key_type_str = map_content[:comma_pos].strip()
-        value_type_str = map_content[comma_pos + 1:].strip()
-        
-        if not key_type_str or not value_type_str:
-            raise ValueError(f"Invalid map type: {type_str}")
-        
-        key_type = _parse_type(key_type_str)
-        value_type = _parse_type(value_type_str)
-        
-        return MapType(type_name="map", key_type=key_type, value_type=value_type)
-    
-    # Handle structs
-    if type_str.startswith("struct<"):
-        if not type_str.endswith(">"):
+        return MapType(
+            type_name="map",
+            key_type=_parse_type(parts[0], depth + 1),
+            value_type=_parse_type(parts[1], depth + 1),
+        )
+    complex_prefix = _complex_prefix_length(type_str, "struct")
+    if complex_prefix is not None:
+        inner = _complex_inner(type_str, "struct", complex_prefix)
+        if not inner.strip():
             raise ValueError(f"Invalid struct type: {type_str}")
-        struct_content = type_str[7:-1].strip()
-        if not struct_content:
-            raise ValueError(f"Invalid struct type: {type_str}")
-        
-        # Check if struct content is a nested struct (no field name)
-        if struct_content.startswith("struct<"):
-            # This is a nested struct without a field name
-            # Parse it as a type
-            nested_type = _parse_type(struct_content)
-            # Create a wrapper struct with a single field
-            return StructType(
-                type_name="struct",
-                fields=[StructField(name="", data_type=nested_type, nullable=True)]
-            )
-        else:
-            # Normal struct with fields
-            struct_schema = parse_ddl_schema(struct_content)
-            return struct_schema
-    
-    # Handle simple types
-    type_lower = type_str.lower()
-    if type_lower in TYPE_MAPPING:
-        return SimpleType(type_name=TYPE_MAPPING[type_lower])
-    
-    # If we get here, the type is not recognized
-    # Check if it contains spaces (indicating missing comma)
-    # But allow spaces in complex types (struct<>, array<>, map<>)
-    if ' ' in type_str and not any(type_str.startswith(prefix) for prefix in ['struct<', 'array<', 'map<']):
+        return _parse_schema(inner, depth + 1)
+
+    if lowered in ("decimal", "dec", "numeric"):
+        return DecimalType(type_name="decimal")
+    if lowered in _TYPE_MAPPING:
+        return SimpleType(type_name=_TYPE_MAPPING[lowered])
+    if any(char.isspace() for char in type_str):
         raise ValueError(f"Invalid field definition: {type_str}")
-    
-    # Default to string if type not recognized
-    return SimpleType(type_name="string")
+    raise ValueError(f"Unsupported data type: {type_str}")
 
 
-def _find_map_comma(s: str) -> int:
-    """Find the comma that separates map key and value types.
-    
-    Handles nested generics correctly.
-    
-    Args:
-        s: String to search (e.g., "string,long" or "string,array<long>")
-    
-    Returns:
-        Index of the comma, or -1 if not found
-    """
-    depth = 0
-    for i, char in enumerate(s):
-        if char == "<":
-            depth += 1
-        elif char == ">":
-            depth -= 1
-        elif char == "," and depth == 0:
-            return i
-    return -1
+def _complex_prefix_length(type_str: str, kind: str) -> int | None:
+    match = re.match(rf"{kind}\s*<", type_str, re.I)
+    return match.end() if match else None
 
+
+def _complex_inner(type_str: str, kind: str, prefix_length: int) -> str:
+    if not type_str.endswith(">"):
+        raise ValueError(f"Invalid {kind} type: {type_str}")
+    inner = type_str[prefix_length:-1]
+    _validate_delimiters(type_str)
+    return inner.strip()

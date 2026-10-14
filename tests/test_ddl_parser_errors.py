@@ -6,6 +6,7 @@ provides clear error messages and doesn't crash.
 """
 
 import pytest
+
 from spark_ddl_parser import parse_ddl_schema
 
 
@@ -13,7 +14,7 @@ class TestDDLParserErrors:
     """Test DDL parser error handling."""
 
     # ==================== Unbalanced Brackets ====================
-    
+
     def test_unbalanced_struct_open(self):
         """Test struct with missing closing bracket."""
         with pytest.raises(ValueError):
@@ -50,7 +51,7 @@ class TestDDLParserErrors:
             parse_ddl_schema("data struct<items:array<string")
 
     # ==================== Invalid Syntax ====================
-    
+
     def test_missing_comma(self):
         """Test schema with missing comma."""
         with pytest.raises(ValueError, match="Invalid field definition"):
@@ -83,12 +84,11 @@ class TestDDLParserErrors:
             parse_ddl_schema(",id long, name string")
 
     # ==================== Invalid Types ====================
-    
+
     def test_invalid_type(self):
         """Test schema with invalid type."""
-        # Should not crash, might return StringType as default
-        schema = parse_ddl_schema("id invalidtype")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Unsupported data type"):
+            parse_ddl_schema("id invalidtype")
 
     def test_empty_array_type(self):
         """Test array with empty type."""
@@ -106,12 +106,11 @@ class TestDDLParserErrors:
             parse_ddl_schema("metadata map<stringstring>")
 
     # ==================== Nested Errors ====================
-    
+
     def test_nested_invalid_type(self):
         """Test nested structure with invalid type."""
-        # Should not crash
-        schema = parse_ddl_schema("data struct<id:invalidtype>")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Unsupported data type"):
+            parse_ddl_schema("data struct<id:invalidtype>")
 
     def test_nested_unbalanced(self):
         """Test nested structure with unbalanced brackets."""
@@ -122,13 +121,11 @@ class TestDDLParserErrors:
         """Test deeply nested structure with unbalanced brackets."""
         with pytest.raises(ValueError):
             parse_ddl_schema(
-                "data struct<"
-                "items:array<map<string,struct<id:long,name:string>>"
-                ">"
+                "data struct<items:array<map<string,struct<id:long,name:string>>>"
             )
 
     # ==================== Empty Structures ====================
-    
+
     def test_empty_struct(self):
         """Test empty struct."""
         # Empty struct might be valid or invalid
@@ -146,32 +143,31 @@ class TestDDLParserErrors:
             parse_ddl_schema("metadata map<>")
 
     # ==================== Invalid Decimal ====================
-    
+
     def test_decimal_letters(self):
         """Test decimal with letters instead of numbers."""
-        # Should not crash, might parse as invalid
-        schema = parse_ddl_schema("value decimal(a,b)")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Invalid decimal type"):
+            parse_ddl_schema("value decimal(a,b)")
 
     def test_decimal_negative_precision(self):
         """Test decimal with negative precision."""
-        schema = parse_ddl_schema("value decimal(-1,2)")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Invalid decimal type"):
+            parse_ddl_schema("value decimal(-1,2)")
 
     def test_decimal_negative_scale(self):
         """Test decimal with negative scale."""
-        schema = parse_ddl_schema("value decimal(10,-2)")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Invalid decimal type"):
+            parse_ddl_schema("value decimal(10,-2)")
 
     def test_decimal_scale_greater_than_precision(self):
         """Test decimal with scale greater than precision."""
-        schema = parse_ddl_schema("value decimal(5,10)")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Invalid decimal type"):
+            parse_ddl_schema("value decimal(5,10)")
 
     def test_decimal_too_large(self):
         """Test decimal with very large numbers."""
-        schema = parse_ddl_schema("value decimal(1000,500)")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Invalid decimal type"):
+            parse_ddl_schema("value decimal(1000,500)")
 
     def test_decimal_missing_closing_paren(self):
         """Test decimal with missing closing parenthesis."""
@@ -184,12 +180,11 @@ class TestDDLParserErrors:
             parse_ddl_schema("value decimal(10,2))")
 
     # ==================== Multiple Colons ====================
-    
+
     def test_double_colon(self):
         """Test field with double colon."""
-        # Should parse as field name with colon in it
-        schema = parse_ddl_schema("id::long")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError):
+            parse_ddl_schema("id::long")
 
     def test_colon_in_middle(self):
         """Test field with colon in middle of name."""
@@ -204,7 +199,7 @@ class TestDDLParserErrors:
             parse_ddl_schema("a::b::c long")
 
     # ==================== Missing Field Names ====================
-    
+
     def test_only_type(self):
         """Test schema with only type, no field name."""
         with pytest.raises(ValueError, match="Invalid field definition"):
@@ -216,7 +211,7 @@ class TestDDLParserErrors:
             parse_ddl_schema("long, string, int")
 
     # ==================== Reserved Words ====================
-    
+
     def test_sql_keyword_as_field_name(self):
         """Test SQL keyword as field name."""
         schema = parse_ddl_schema("select string, from string, where int")
@@ -228,7 +223,7 @@ class TestDDLParserErrors:
         assert len(schema.fields) == 3
 
     # ==================== Special Characters ====================
-    
+
     def test_special_chars_in_field_name(self):
         """Test special characters in field name."""
         schema = parse_ddl_schema("field-name string, field.name int")
@@ -242,12 +237,11 @@ class TestDDLParserErrors:
 
     def test_backticks_in_field_name(self):
         """Test backticks in field name."""
-        # Parser doesn't support backtick-quoted field names
-        with pytest.raises(ValueError):
-            parse_ddl_schema("`field name` string")
+        schema = parse_ddl_schema("`field name` string")
+        assert schema.fields[0].name == "field name"
 
     # ==================== Edge Cases ====================
-    
+
     def test_only_comma(self):
         """Test schema with only comma."""
         with pytest.raises(ValueError, match="Invalid field definition"):
@@ -274,7 +268,7 @@ class TestDDLParserErrors:
             parse_ddl_schema("data struct<id:long,name,age:int>")
 
     # ==================== Type Parsing Errors ====================
-    
+
     def test_incomplete_array(self):
         """Test incomplete array type."""
         with pytest.raises(ValueError):
@@ -296,32 +290,26 @@ class TestDDLParserErrors:
             parse_ddl_schema("value decimal(")
 
     # ==================== Complex Invalid Structures ====================
-    
+
     def test_array_with_struct_unbalanced(self):
         """Test array of struct with unbalanced brackets."""
         with pytest.raises(ValueError):
-            parse_ddl_schema(
-                "users array<struct<id:long,name:string,age:int>"
-            )
+            parse_ddl_schema("users array<struct<id:long,name:string,age:int>")
 
     def test_map_with_array_unbalanced(self):
         """Test map of array with unbalanced brackets."""
         with pytest.raises(ValueError):
-            parse_ddl_schema(
-                "data map<string,array<int>"
-            )
+            parse_ddl_schema("data map<string,array<int>")
 
     def test_nested_mixed_unbalanced(self):
         """Test nested mixed types with unbalanced brackets."""
         with pytest.raises(ValueError):
             parse_ddl_schema(
-                "complex struct<"
-                "items:array<map<string,struct<id:long,name:string>>"
-                ">"
+                "complex struct<items:array<map<string,struct<id:long,name:string>>>"
             )
 
     # ==================== Whitespace Errors ====================
-    
+
     def test_no_space_after_field_name(self):
         """Test field without space after name."""
         # Should parse as colon format
@@ -335,7 +323,7 @@ class TestDDLParserErrors:
             parse_ddl_schema("idlong")
 
     # ==================== Boundary Conditions ====================
-    
+
     def test_very_long_invalid_input(self):
         """Test very long invalid input."""
         long_string = "a" * 10000
@@ -353,19 +341,18 @@ class TestDDLParserErrors:
             parse_ddl_schema("array<>")
 
     # ==================== Type Name Errors ====================
-    
+
     def test_type_with_extra_chars(self):
         """Test type with extra characters."""
-        schema = parse_ddl_schema("id longextra")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Unsupported data type"):
+            parse_ddl_schema("id longextra")
 
     def test_type_with_numbers(self):
         """Test type with numbers."""
-        schema = parse_ddl_schema("id long123")
-        assert len(schema.fields) == 1
+        with pytest.raises(ValueError, match="Unsupported data type"):
+            parse_ddl_schema("id long123")
 
     def test_type_with_special_chars(self):
         """Test type with special characters."""
-        schema = parse_ddl_schema("id long-type")
-        assert len(schema.fields) == 1
-
+        with pytest.raises(ValueError, match="Unsupported data type"):
+            parse_ddl_schema("id long-type")

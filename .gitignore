@@ -21,6 +21,7 @@ wheels/
 *.egg
 .benchmarks
 .ruff_cache/
+rust/target/
 
 # Virtual environments
 venv/

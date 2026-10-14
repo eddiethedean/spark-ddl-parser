@@ -8,23 +8,23 @@ Example:
     >>> from spark_ddl_parser import parse_ddl_schema
     >>> schema = parse_ddl_schema("id long, name string")
     >>> print(schema.fields[0].name)
-    'id'
+    id
     >>> print(schema.fields[0].data_type.type_name)
-    'long'
+    long
 """
 
 from .parser import parse_ddl_schema
 from .types import (
-    DataType,
-    SimpleType,
-    DecimalType,
     ArrayType,
+    DataType,
+    DecimalType,
     MapType,
-    StructType,
+    SimpleType,
     StructField,
+    StructType,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "parse_ddl_schema",
     "DataType",
@@ -35,4 +35,3 @@ __all__ = [
     "StructType",
     "StructField",
 ]
-

@@ -12,7 +12,7 @@ class TestDDLParserRealWorld:
     """Test DDL parser with real-world schemas."""
 
     # ==================== E-commerce Schemas ====================
-    
+
     def test_product_schema(self):
         """Test product catalog schema."""
         schema = parse_ddl_schema(
@@ -43,7 +43,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Financial Schemas ====================
-    
+
     def test_transaction_schema(self):
         """Test financial transaction schema."""
         schema = parse_ddl_schema(
@@ -62,7 +62,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 6
 
     # ==================== IoT/Streaming Schemas ====================
-    
+
     def test_sensor_data_schema(self):
         """Test IoT sensor data schema."""
         schema = parse_ddl_schema(
@@ -81,7 +81,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 6
 
     # ==================== Log/Event Schemas ====================
-    
+
     def test_web_log_schema(self):
         """Test web server log schema."""
         schema = parse_ddl_schema(
@@ -101,7 +101,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== ML Feature Schemas ====================
-    
+
     def test_feature_vector_schema(self):
         """Test ML feature vector schema."""
         schema = parse_ddl_schema(
@@ -121,7 +121,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 3
 
     # ==================== Social Media Schemas ====================
-    
+
     def test_post_schema(self):
         """Test social media post schema."""
         schema = parse_ddl_schema(
@@ -144,7 +144,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 5
 
     # ==================== Scientific Data Schemas ====================
-    
+
     def test_experiment_data_schema(self):
         """Test scientific experiment data schema."""
         schema = parse_ddl_schema(
@@ -157,7 +157,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 4
 
     # ==================== Time Series Schemas ====================
-    
+
     def test_time_series_schema(self):
         """Test time series data schema."""
         schema = parse_ddl_schema(
@@ -169,7 +169,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 5
 
     # ==================== Nested JSON-like Schemas ====================
-    
+
     def test_nested_json_schema(self):
         """Test deeply nested JSON-like schema."""
         schema = parse_ddl_schema(
@@ -199,7 +199,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 1
 
     # ==================== AWS Glue Style Schemas ====================
-    
+
     def test_glue_catalog_schema(self):
         """Test AWS Glue catalog style schema."""
         schema = parse_ddl_schema(
@@ -212,7 +212,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 4
 
     # ==================== Databricks Delta Schemas ====================
-    
+
     def test_delta_table_schema(self):
         """Test Databricks Delta table schema."""
         schema = parse_ddl_schema(
@@ -223,7 +223,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Data Warehouse Schemas ====================
-    
+
     def test_fact_table_schema(self):
         """Test data warehouse fact table schema."""
         schema = parse_ddl_schema(
@@ -243,7 +243,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 6
 
     # ==================== Event Sourcing Schemas ====================
-    
+
     def test_event_store_schema(self):
         """Test event store schema."""
         schema = parse_ddl_schema(
@@ -254,7 +254,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== API Data Schemas ====================
-    
+
     def test_api_response_schema(self):
         """Test API response schema."""
         schema = parse_ddl_schema(
@@ -266,7 +266,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 4
 
     # ==================== Document Store Schemas ====================
-    
+
     def test_document_schema(self):
         """Test document store schema."""
         schema = parse_ddl_schema(
@@ -277,7 +277,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 8
 
     # ==================== Analytics Schemas ====================
-    
+
     def test_pageview_schema(self):
         """Test web analytics pageview schema."""
         schema = parse_ddl_schema(
@@ -300,7 +300,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Inventory Schemas ====================
-    
+
     def test_inventory_schema(self):
         """Test inventory management schema."""
         schema = parse_ddl_schema(
@@ -311,7 +311,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Healthcare Schemas ====================
-    
+
     def test_patient_schema(self):
         """Test healthcare patient schema."""
         schema = parse_ddl_schema(
@@ -333,7 +333,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Supply Chain Schemas ====================
-    
+
     def test_shipment_schema(self):
         """Test supply chain shipment schema."""
         schema = parse_ddl_schema(
@@ -346,7 +346,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 9
 
     # ==================== Gaming Schemas ====================
-    
+
     def test_game_event_schema(self):
         """Test gaming event schema."""
         schema = parse_ddl_schema(
@@ -358,7 +358,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 7
 
     # ==================== Streaming Data Schemas ====================
-    
+
     def test_streaming_event_schema(self):
         """Test streaming event schema."""
         schema = parse_ddl_schema(
@@ -369,7 +369,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 6
 
     # ==================== TPC-H Style Schemas ====================
-    
+
     def test_lineitem_schema(self):
         """Test TPC-H lineitem schema."""
         schema = parse_ddl_schema(
@@ -393,7 +393,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 9
 
     # ==================== Graph Data Schemas ====================
-    
+
     def test_graph_node_schema(self):
         """Test graph node schema."""
         schema = parse_ddl_schema(
@@ -413,7 +413,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 6
 
     # ==================== Multi-tenant Schemas ====================
-    
+
     def test_tenant_data_schema(self):
         """Test multi-tenant data schema."""
         schema = parse_ddl_schema(
@@ -427,7 +427,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 4
 
     # ==================== Audit Log Schemas ====================
-    
+
     def test_audit_log_schema(self):
         """Test audit log schema."""
         schema = parse_ddl_schema(
@@ -439,7 +439,7 @@ class TestDDLParserRealWorld:
         assert len(schema.fields) == 9
 
     # ==================== Configuration Schemas ====================
-    
+
     def test_config_schema(self):
         """Test configuration schema."""
         schema = parse_ddl_schema(
@@ -452,4 +452,3 @@ class TestDDLParserRealWorld:
             ">, version string"
         )
         assert len(schema.fields) == 5
-

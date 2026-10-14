@@ -36,6 +36,10 @@ pub enum ParseError {
     InvalidArrayType(String),
     /// Invalid map type
     InvalidMapType(String),
+    /// Data type name is not supported.
+    UnsupportedType(String),
+    /// Schema nesting exceeds the supported safety limit.
+    MaximumNestingDepth(usize),
 }
 
 impl fmt::Display for ParseError {
@@ -79,6 +83,12 @@ impl fmt::Display for ParseError {
             }
             ParseError::InvalidMapType(s) => {
                 write!(f, "Invalid map type: {}", s)
+            }
+            ParseError::UnsupportedType(s) => {
+                write!(f, "Unsupported data type: {}", s)
+            }
+            ParseError::MaximumNestingDepth(limit) => {
+                write!(f, "Maximum DDL nesting depth ({}) exceeded", limit)
             }
         }
     }

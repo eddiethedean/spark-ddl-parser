@@ -197,20 +197,17 @@ fn err_missing_type() {
 }
 
 #[test]
-fn invalid_type_defaults_to_string() {
-    // Python: unknown type defaults to string
-    let schema = parse_ddl_schema("id invalidtype").unwrap();
-    assert_eq!(schema.fields.len(), 1);
-    assert_eq!(schema.fields[0].data_type.type_name(), "string");
+fn invalid_type_is_rejected() {
+    assert!(matches!(
+        parse_ddl_schema("id invalidtype").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }
 
 #[test]
-fn nested_invalid_type_defaults_to_string() {
-    let schema = parse_ddl_schema("data struct<id:invalidtype>").unwrap();
-    assert_eq!(schema.fields.len(), 1);
-    let inner = match &schema.fields[0].data_type {
-        DataType::Struct(s) => s,
-        _ => panic!("expected struct"),
-    };
-    assert_eq!(inner.fields[0].data_type.type_name(), "string");
+fn nested_invalid_type_is_rejected() {
+    assert!(matches!(
+        parse_ddl_schema("data struct<id:invalidtype>").unwrap_err(),
+        ParseError::UnsupportedType(_)
+    ));
 }

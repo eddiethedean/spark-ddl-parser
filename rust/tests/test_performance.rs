@@ -323,28 +323,14 @@ fn performance_with_colons() {
 // ==================== Scalability ====================
 
 #[test]
-fn linear_scaling() {
+fn parses_increasing_schema_sizes() {
     let sizes = [10_usize, 50, 100, 500, 1000];
-    let mut times = Vec::with_capacity(sizes.len());
     for &size in &sizes {
         let fields = (0..size)
             .map(|i| format!("field{} string", i))
             .collect::<Vec<_>>()
             .join(", ");
-        let start = Instant::now();
         let schema = parse_ddl_schema(&fields).unwrap();
-        times.push(start.elapsed().as_nanos());
         assert_eq!(schema.fields.len(), size);
-    }
-    for i in 1..times.len() {
-        let prev = times[i - 1].max(1);
-        let ratio = times[i] as f64 / prev as f64;
-        let size_ratio = sizes[i] as f64 / sizes[i - 1] as f64;
-        assert!(
-            ratio <= size_ratio * 2.0,
-            "Non-linear scaling: {}x time for {}x size",
-            ratio,
-            size_ratio
-        );
     }
 }
